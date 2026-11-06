@@ -1,16 +1,34 @@
 # FeedMePLZ
 
-Addon WoW : un bouton flottant qui mange la nourriture de vos sacs en prenant
-toujours **la plus petite pile** (2 poulets + 20 champignons → mange un poulet).
+Addon WoW : deux boutons flottants qui mangent la nourriture de vos sacs.
+
+- **Nourriture simple** : la nourriture sans buff.
+- **Nourriture à stats** (bordure dorée) : celle qui donne « Bien nourri »,
+  à garder pour les donjons.
+
+Chaque bouton choisit sa nourriture selon un **classement de critères**
+configurable (par défaut : stack la plus basse, puis niveau le plus faible).
+Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 ## Utilisation
 
-- Clic sur le bouton : mange.
-- **Maj + glisser** : déplacer le bouton (position sauvegardée).
-- `/fmp lock` / `unlock` / `reset` / `show` / `hide`
+- Clic sur un bouton : mange.
+- **Maj + glisser** : déplacer un bouton (position sauvegardée).
+- `/fmp` : ouvre les options (aussi dans Échap → Options → AddOns).
+- `/fmp lock` / `unlock` / `reset`
 
-La nourriture est détectée via le sort « Nourriture » de l'objet, donc ça marche
-quelle que soit la langue du client. Les boissons ne sont pas prises.
+### Options
+
+- Afficher / masquer chaque bouton, verrouiller, réinitialiser les positions.
+- Ordre de priorité : cocher les critères utilisés et les ordonner avec ↑/↓.
+  Le premier critère coché départage ; en cas d'égalité, on passe au suivant.
+  Critères : stack la plus basse / haute, niveau requis le plus faible / élevé.
+
+## Détection
+
+- Nourriture : l'objet lance le sort « Nourriture » (indépendant de la langue).
+- À stats : sa description contient « Bien nourri » / « Well Fed ».
+- Les boissons ne sont pas prises.
 
 ## Installation
 
