@@ -1,0 +1,8 @@
+## Interface: 11508, 20505, 30405, 40402, 50500
+## Title: FeedMePLZ
+## Notes: Bouton flottant qui mange la nourriture de la plus petite pile du sac.
+## Author: Kirbye
+## Version: 1.0.0
+## SavedVariables: FeedMePLZDB
+
+FeedMePLZ.lua
