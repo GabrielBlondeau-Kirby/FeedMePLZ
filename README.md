@@ -5,6 +5,8 @@ Addon WoW : deux boutons flottants qui mangent la nourriture de vos sacs.
 - **Nourriture simple** : la nourriture sans buff.
 - **Nourriture à stats** (bordure dorée) : celle qui donne « Bien nourri »,
   à garder pour les donjons.
+- **Boisson** (bordure bleue) : pour les classes à mana. Masqué
+  automatiquement pour les guerriers, voleurs (et chevaliers de la mort).
 
 Chaque bouton choisit sa nourriture selon un **classement de critères**
 configurable (par défaut : stack la plus basse, puis niveau le plus faible).
@@ -30,7 +32,7 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 - Nourriture : l'objet lance le sort « Nourriture » (indépendant de la langue).
 - À stats : sa description contient « Bien nourri » / « Well Fed ».
-- Les boissons ne sont pas prises.
+- Boisson : l'objet lance le sort « Boisson ».
 
 ## Installation
 
