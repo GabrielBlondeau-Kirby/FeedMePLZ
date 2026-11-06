@@ -396,7 +396,7 @@ mmBg:SetSize(20, 20)
 mmBg:SetPoint("TOPLEFT", 7, -5)
 
 local mmIcon = minimapBtn:CreateTexture(nil, "ARTWORK")
-mmIcon:SetTexture("Interface\\Icons\\INV_Misc_Fork&Knife")
+mmIcon:SetTexture("Interface\\AddOns\\FeedMePLZ\\Media\\icon")
 mmIcon:SetSize(17, 17)
 mmIcon:SetPoint("TOPLEFT", 7, -6)
 mmIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
