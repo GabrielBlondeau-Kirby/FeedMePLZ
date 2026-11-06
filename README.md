@@ -16,6 +16,8 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 - **Maj + glisser** : déplacer un bouton (position sauvegardée).
 - `/fmp` : ouvre les options (aussi dans Échap → Options → AddOns).
 - `/fmp lock` / `unlock` / `reset`
+- **Icône de la minimap** : clic gauche = options, clic droit = afficher /
+  masquer les boutons, glisser = la déplacer autour de la minimap.
 
 ### Options
 

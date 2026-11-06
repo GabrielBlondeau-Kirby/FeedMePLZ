@@ -50,6 +50,7 @@ local function InitDB()
     DB.pos = (type(DB.pos) == "table" and DB.pos.plain == nil and DB.pos[1]) and { plain = DB.pos } or (DB.pos or {})
     if DB.showPlain == nil then DB.showPlain = true end
     if DB.showStats == nil then DB.showStats = true end
+    DB.minimap = DB.minimap or { angle = 225, hide = false }
     -- Classement : on garde l'ordre sauvegardé, on ajoute les critères manquants.
     local seen, order = {}, {}
     for _, c in ipairs(DB.criteria or {}) do
@@ -281,11 +282,14 @@ local cbStats = CheckBox(panel, "Afficher le bouton « Nourriture à stats » (b
 cbStats:SetPoint("TOPLEFT", 16, -88)
 local cbLock = CheckBox(panel, "Verrouiller la position des boutons", function(v) DB.locked = v end)
 cbLock:SetPoint("TOPLEFT", 16, -116)
+local SetMinimapShown -- défini plus bas
+local cbMinimap = CheckBox(panel, "Afficher l'icône autour de la minimap", function(v) SetMinimapShown(v) end)
+cbMinimap:SetPoint("TOPLEFT", 16, -144)
 
 local resetBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 resetBtn:SetSize(160, 22)
 resetBtn:SetText("Réinitialiser positions")
-resetBtn:SetPoint("TOPLEFT", 20, -148)
+resetBtn:SetPoint("TOPLEFT", 20, -176)
 resetBtn:SetScript("OnClick", function()
     if InCombatLockdown() then print(PREFIX .. "impossible en combat.") return end
     DB.pos = {}
@@ -294,7 +298,7 @@ resetBtn:SetScript("OnClick", function()
 end)
 
 local header = Label(panel, "Ordre de priorité", "GameFontNormal")
-header:SetPoint("TOPLEFT", 16, -190)
+header:SetPoint("TOPLEFT", 16, -218)
 local help = Label(panel, "Le 1er critère coché départage ; en cas d'égalité, on passe au suivant.", "GameFontHighlightSmall")
 help:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
 
@@ -322,7 +326,7 @@ local function ArrowButton(parent, dir)
 end
 
 for i = 1, #DEFAULT_ORDER do
-    local y = -230 - (i - 1) * 30
+    local y = -258 - (i - 1) * 30
     local row = {}
     row.rank = Label(panel, i .. ".", "GameFontNormal")
     row.rank:SetPoint("TOPLEFT", 20, y - 6)
@@ -352,6 +356,7 @@ panel:SetScript("OnShow", function()
     cbPlain:SetChecked(DB.showPlain)
     cbStats:SetChecked(DB.showStats)
     cbLock:SetChecked(DB.locked)
+    cbMinimap:SetChecked(not DB.minimap.hide)
     RefreshRows()
 end)
 
@@ -373,6 +378,76 @@ local function OpenPanel()
         InterfaceOptionsFrame_OpenToCategory(panel) -- 2e appel : bug connu du 1er affichage
     end
 end
+
+---------------------------------------------------------------------------
+-- Icône autour de la minimap (glisser pour la faire tourner)
+---------------------------------------------------------------------------
+local minimapBtn = CreateFrame("Button", "FeedMePLZMinimapButton", Minimap)
+minimapBtn:SetSize(31, 31)
+minimapBtn:SetFrameStrata("MEDIUM")
+minimapBtn:SetFrameLevel(8)
+minimapBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+minimapBtn:RegisterForDrag("LeftButton")
+minimapBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+
+local mmBg = minimapBtn:CreateTexture(nil, "BACKGROUND")
+mmBg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+mmBg:SetSize(20, 20)
+mmBg:SetPoint("TOPLEFT", 7, -5)
+
+local mmIcon = minimapBtn:CreateTexture(nil, "ARTWORK")
+mmIcon:SetTexture("Interface\\Icons\\INV_Misc_Food_15")
+mmIcon:SetSize(17, 17)
+mmIcon:SetPoint("TOPLEFT", 7, -6)
+mmIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+local mmBorder = minimapBtn:CreateTexture(nil, "OVERLAY")
+mmBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+mmBorder:SetSize(53, 53)
+mmBorder:SetPoint("TOPLEFT")
+
+local function PlaceMinimapButton()
+    local a = math.rad(DB.minimap.angle)
+    local r = Minimap:GetWidth() / 2 + 5
+    minimapBtn:ClearAllPoints()
+    minimapBtn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
+end
+
+SetMinimapShown = function(shown)
+    DB.minimap.hide = not shown
+    minimapBtn:SetShown(shown)
+end
+
+minimapBtn:SetScript("OnDragStart", function(self)
+    self:SetScript("OnUpdate", function()
+        local mx, my = Minimap:GetCenter()
+        local px, py = GetCursorPosition()
+        local scale = Minimap:GetEffectiveScale()
+        DB.minimap.angle = math.deg(math.atan2(py / scale - my, px / scale - mx))
+        PlaceMinimapButton()
+    end)
+end)
+minimapBtn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+
+minimapBtn:SetScript("OnClick", function(_, mouse)
+    if mouse == "RightButton" then
+        if InCombatLockdown() then print(PREFIX .. "impossible en combat.") return end
+        DB.showPlain = not (DB.showPlain or DB.showStats)
+        DB.showStats = DB.showPlain
+        Refresh()
+    else
+        OpenPanel()
+    end
+end)
+minimapBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetText("FeedMePLZ", 1, 0.53, 0)
+    GameTooltip:AddLine("Clic gauche : options", 1, 1, 1)
+    GameTooltip:AddLine("Clic droit : afficher / masquer les boutons", 1, 1, 1)
+    GameTooltip:AddLine("Glisser : déplacer autour de la minimap", 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end)
+minimapBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 ---------------------------------------------------------------------------
 -- Événements
@@ -405,6 +480,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
             ApplyPosition(buttons.plain)
             ApplyPosition(buttons.stats)
             RegisterPanel()
+            PlaceMinimapButton()
+            minimapBtn:SetShown(not DB.minimap.hide)
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if pending then Refresh() end
