@@ -339,7 +339,7 @@ toggle:SetAttribute("_onclick", [[
 
 -- Entrée en combat : on ferme et l'icône devient transparente.
 -- Sortie : l'icône redevient opaque et on rouvre si c'est le combat qui a fermé.
-frame:SetFrameRef("toggle", toggle)
+SecureHandlerSetFrameRef(frame, "toggle", toggle) -- le modèle « State » n'a pas de méthode SetFrameRef
 frame:SetAttribute("_onstate-combat", [[
     local toggle = self:GetFrameRef("toggle")
     if newstate == "1" then
