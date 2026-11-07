@@ -1,9 +1,10 @@
-## Interface: 16001, 11508, 20505, 30405, 40402, 50500
+## Interface: 16001
 ## Title: FeedMePLZ
-## Notes: Bouton flottant qui mange la nourriture de la plus petite pile du sac.
+## Notes: Floating button that eats the food from your smallest stack.
+## Notes-frFR: Bouton flottant qui mange la nourriture de la plus petite pile du sac.
 ## IconTexture: Interface\AddOns\FeedMePLZ\Media\icon
 ## Author: Kirbye
-## Version: 1.0.0
+## Version: @project-version@
 ## SavedVariables: FeedMePLZDB
 
 FeedMePLZ.lua

@@ -1,0 +1,6 @@
+package-as: FeedMePLZ
+
+ignore:
+  - README.md
+  - curseforge
+  - .github
