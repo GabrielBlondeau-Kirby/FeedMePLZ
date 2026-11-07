@@ -12,6 +12,7 @@ Made for **WoW Forever**.
   - **Drink** (blue border): only shown for mana classes.
 - **Configurable priority**: tick and reorder the criteria — lowest stack, highest stack, lowest level, highest level.
 - **Minimap button**: left-click for options, right-click to show/hide the buttons, drag to move it.
+- **Languages**: English and French interface (Auto follows the game client).
 - Works in any client language (detection uses the game's own *Food* / *Drink* spells).
 
 ## Usage
@@ -29,4 +30,5 @@ Made for **WoW Forever**.
 - **Nourriture simple**, **nourriture à stats** (bordure dorée, gardée pour les donjons) et **boisson** (bordure bleue, classes à mana uniquement).
 - **Ordre de priorité configurable** : stack la plus basse / haute, niveau le plus faible / élevé.
 - **Icône de minimap** : clic gauche = options, clic droit = afficher / masquer, glisser = déplacer.
+- Interface en anglais ou en français (Auto = langue du jeu).
 - `/fmp` : options. **Maj + glisser** : déplacer un bouton.

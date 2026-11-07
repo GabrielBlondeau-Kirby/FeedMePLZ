@@ -4,6 +4,102 @@ local ADDON = ...
 local PREFIX = "|cffff8800FeedMePLZ|r : "
 
 ---------------------------------------------------------------------------
+-- Langues de l'interface (la détection de la nourriture n'en dépend pas :
+-- elle se base sur les sorts « Nourriture » / « Boisson » du client).
+---------------------------------------------------------------------------
+local LANGS = {
+    enUS = {
+        name = "English",
+        ui = {
+            subtitle = "Automatically picks the food to eat.",
+            kind_plain = "Plain food",
+            kind_stats = "Stat food",
+            kind_drink = "Drink",
+            empty = "Nothing in your bags.",
+            btn_hint = "Shift + drag: move   /fmp: options",
+            opt_plain = "Show the \"Plain food\" button",
+            opt_stats = "Show the \"Stat food\" button (gold border)",
+            opt_drink = "Show the \"Drink\" button (blue border, mana classes)",
+            opt_lock = "Lock button positions",
+            opt_minimap = "Show the minimap icon",
+            opt_reset = "Reset positions",
+            opt_priority = "Priority order",
+            opt_priority_help = "The first ticked criterion decides; on a tie, the next one is used.",
+            opt_lang = "Language",
+            opt_lang_hint = "Interface language. Auto = game language.",
+            lang_auto = "Auto (game)",
+            crit_stackLow = "Lowest stack",
+            crit_stackHigh = "Highest stack",
+            crit_levelLow = "Lowest level",
+            crit_levelHigh = "Highest level",
+            mm_left = "Left-click: options",
+            mm_right = "Right-click: show / hide the buttons",
+            mm_drag = "Drag: move around the minimap",
+            msg_combat = "not possible in combat.",
+            msg_locked = "buttons locked.",
+            msg_unlocked = "buttons unlocked (Shift + drag).",
+            msg_reset = "positions reset.",
+            msg_usage = "/fmp (options) | lock | unlock | reset",
+        },
+    },
+    frFR = {
+        name = "Français",
+        ui = {
+            subtitle = "Choix automatique de la nourriture à manger.",
+            kind_plain = "Nourriture simple",
+            kind_stats = "Nourriture à stats",
+            kind_drink = "Boisson",
+            empty = "Rien dans les sacs.",
+            btn_hint = "Maj + glisser : déplacer   /fmp : options",
+            opt_plain = "Afficher le bouton « Nourriture simple »",
+            opt_stats = "Afficher le bouton « Nourriture à stats » (bordure dorée)",
+            opt_drink = "Afficher le bouton « Boisson » (bordure bleue, classes à mana)",
+            opt_lock = "Verrouiller la position des boutons",
+            opt_minimap = "Afficher l'icône autour de la minimap",
+            opt_reset = "Réinitialiser positions",
+            opt_priority = "Ordre de priorité",
+            opt_priority_help = "Le 1er critère coché départage ; en cas d'égalité, on passe au suivant.",
+            opt_lang = "Langue",
+            opt_lang_hint = "Langue de l'interface. Auto = langue du jeu.",
+            lang_auto = "Auto (jeu)",
+            crit_stackLow = "Stack la plus basse",
+            crit_stackHigh = "Stack la plus haute",
+            crit_levelLow = "Niveau le plus faible",
+            crit_levelHigh = "Niveau le plus élevé",
+            mm_left = "Clic gauche : options",
+            mm_right = "Clic droit : afficher / masquer les boutons",
+            mm_drag = "Glisser : déplacer autour de la minimap",
+            msg_combat = "impossible en combat.",
+            msg_locked = "boutons verrouillés.",
+            msg_unlocked = "boutons déverrouillés (Maj + glisser).",
+            msg_reset = "positions réinitialisées.",
+            msg_usage = "/fmp (options) | lock | unlock | reset",
+        },
+    },
+}
+local LANG_CHOICES = { "auto", "enUS", "frFR" }
+
+local DB
+local L = LANGS[GetLocale() == "frFR" and "frFR" or "enUS"]
+
+-- Langue effective : celle choisie, sinon celle du client (anglais par défaut).
+local function ResolveLang()
+    local choice = DB and DB.lang or "auto"
+    if LANGS[choice] then return LANGS[choice] end
+    return LANGS[GetLocale() == "frFR" and "frFR" or "enUS"]
+end
+
+local function T(key) return L.ui[key] or LANGS.enUS.ui[key] or key end
+
+-- Textes à retraduire quand on change de langue : { objet, clé }.
+local localized = {}
+local function Loc(obj, key)
+    table.insert(localized, { obj, key })
+    obj:SetText(T(key))
+    return obj
+end
+
+---------------------------------------------------------------------------
 -- Compatibilité API (Classic récent : C_Container / C_Item / C_Spell)
 ---------------------------------------------------------------------------
 local GetNumSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
@@ -31,10 +127,10 @@ local GetItemIconCompat  = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
 -- Réglages
 ---------------------------------------------------------------------------
 local CRITERIA = {
-    stackLow  = { label = "Stack la plus basse",  value = function(e) return e.count end,  low = true  },
-    stackHigh = { label = "Stack la plus haute",  value = function(e) return e.count end,  low = false },
-    levelLow  = { label = "Niveau le plus faible", value = function(e) return e.level end, low = true  },
-    levelHigh = { label = "Niveau le plus élevé", value = function(e) return e.level end, low = false },
+    stackLow  = { value = function(e) return e.count end, low = true  },
+    stackHigh = { value = function(e) return e.count end, low = false },
+    levelLow  = { value = function(e) return e.level end, low = true  },
+    levelHigh = { value = function(e) return e.level end, low = false },
 }
 local DEFAULT_ORDER = {
     { key = "stackLow",  on = true  },
@@ -43,10 +139,10 @@ local DEFAULT_ORDER = {
     { key = "levelHigh", on = false },
 }
 
-local DB
 local function InitDB()
     FeedMePLZDB = FeedMePLZDB or {}
     DB = FeedMePLZDB
+    DB.lang = LANGS[DB.lang or ""] and DB.lang or "auto"
     DB.pos = (type(DB.pos) == "table" and DB.pos.plain == nil and DB.pos[1]) and { plain = DB.pos } or (DB.pos or {})
     if DB.showPlain == nil then DB.showPlain = true end
     if DB.showStats == nil then DB.showStats = true end
@@ -162,9 +258,9 @@ local function ApplyPosition(btn)
     end
 end
 
-local function CreateFoodButton(kind, title, defaultX, emptyIcon, borderColor)
+local function CreateFoodButton(kind, defaultX, emptyIcon, borderColor)
     local btn = CreateFrame("Button", "FeedMePLZ" .. kind .. "Button", UIParent, "SecureActionButtonTemplate")
-    btn.kind, btn.title, btn.defaultX, btn.emptyIcon = kind, title, defaultX, emptyIcon
+    btn.kind, btn.defaultX, btn.emptyIcon = kind, defaultX, emptyIcon
     btn:SetSize(40, 40)
     btn:SetMovable(true)
     btn:SetClampedToScreen(true)
@@ -198,15 +294,16 @@ local function CreateFoodButton(kind, title, defaultX, emptyIcon, borderColor)
     end)
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local title = T("kind_" .. self.kind)
         if self.itemID then
             GameTooltip:SetHyperlink("item:" .. self.itemID)
         else
-            GameTooltip:SetText(self.title)
-            GameTooltip:AddLine("Rien dans les sacs.", 1, 0.3, 0.3)
+            GameTooltip:SetText(title)
+            GameTooltip:AddLine(T("empty"), 1, 0.3, 0.3)
         end
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("FeedMePLZ — " .. self.title, 1, 0.53, 0)
-        GameTooltip:AddLine("Maj + glisser : déplacer   /fmp : options", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("FeedMePLZ — " .. title, 1, 0.53, 0)
+        GameTooltip:AddLine(T("btn_hint"), 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -215,9 +312,9 @@ local function CreateFoodButton(kind, title, defaultX, emptyIcon, borderColor)
     return btn
 end
 
-CreateFoodButton("plain", "Nourriture simple", -24, "Interface\\Icons\\INV_Misc_Food_15")
-CreateFoodButton("stats", "Nourriture à stats", 24, "Interface\\Icons\\INV_Misc_Food_64", { 1, 0.82, 0 })
-CreateFoodButton("drink", "Boisson", 72, "Interface\\Icons\\INV_Drink_07", { 0.4, 0.7, 1 })
+CreateFoodButton("plain", -24, "Interface\\Icons\\INV_Misc_Food_15")
+CreateFoodButton("stats", 24, "Interface\\Icons\\INV_Misc_Food_64", { 1, 0.82, 0 })
+CreateFoodButton("drink", 72, "Interface\\Icons\\INV_Drink_07", { 0.4, 0.7, 1 })
 
 -- Classes sans mana : pas de bouton Boisson.
 local NO_MANA = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true, DEMONHUNTER = true }
@@ -267,20 +364,21 @@ local panel = CreateFrame("Frame", "FeedMePLZOptions")
 panel.name = "FeedMePLZ"
 panel:Hide()
 
-local function Label(parent, text, template)
+-- key : clé de traduction (texte retraduit au changement de langue), ou nil.
+local function Label(parent, key, template)
     local fs = parent:CreateFontString(nil, "ARTWORK", template or "GameFontHighlight")
-    fs:SetText(text)
+    if key then Loc(fs, key) end
     return fs
 end
 
-local function CheckBox(parent, text, onClick)
+local function CheckBox(parent, key, onClick)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     cb:SetSize(26, 26)
-    cb.label = Label(cb, text)
+    cb.label = Label(cb, key)
     cb.label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
     cb:SetScript("OnClick", function(self)
         if InCombatLockdown() then
-            print(PREFIX .. "impossible en combat.")
+            print(PREFIX .. T("msg_combat"))
             self:SetChecked(not self:GetChecked())
             return
         end
@@ -289,36 +387,37 @@ local function CheckBox(parent, text, onClick)
     return cb
 end
 
-local title = Label(panel, "FeedMePLZ", "GameFontNormalLarge")
+local title = Label(panel, nil, "GameFontNormalLarge")
+title:SetText("FeedMePLZ")
 title:SetPoint("TOPLEFT", 16, -16)
 
-local subtitle = Label(panel, "Choix automatique de la nourriture à manger.", "GameFontHighlightSmall")
+local subtitle = Label(panel, "subtitle", "GameFontHighlightSmall")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 
-local cbPlain = CheckBox(panel, "Afficher le bouton « Nourriture simple »", function(v) DB.showPlain = v; Refresh() end)
+local cbPlain = CheckBox(panel, "opt_plain", function(v) DB.showPlain = v; Refresh() end)
 cbPlain:SetPoint("TOPLEFT", 16, -60)
-local cbStats = CheckBox(panel, "Afficher le bouton « Nourriture à stats » (bordure dorée)", function(v) DB.showStats = v; Refresh() end)
+local cbStats = CheckBox(panel, "opt_stats", function(v) DB.showStats = v; Refresh() end)
 cbStats:SetPoint("TOPLEFT", 16, -88)
-local cbDrink = CheckBox(panel, "Afficher le bouton « Boisson » (bordure bleue, classes à mana)", function(v) DB.showDrink = v; Refresh() end)
+local cbDrink = CheckBox(panel, "opt_drink", function(v) DB.showDrink = v; Refresh() end)
 cbDrink:SetPoint("TOPLEFT", 16, -116)
-local cbLock = CheckBox(panel, "Verrouiller la position des boutons", function(v) DB.locked = v end)
+local cbLock = CheckBox(panel, "opt_lock", function(v) DB.locked = v end)
 cbLock:SetPoint("TOPLEFT", 16, -144)
 local SetMinimapShown -- défini plus bas
-local cbMinimap = CheckBox(panel, "Afficher l'icône autour de la minimap", function(v) SetMinimapShown(v) end)
+local cbMinimap = CheckBox(panel, "opt_minimap", function(v) SetMinimapShown(v) end)
 cbMinimap:SetPoint("TOPLEFT", 16, -172)
 
 local resetBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 resetBtn:SetSize(160, 22)
-resetBtn:SetText("Réinitialiser positions")
+Loc(resetBtn, "opt_reset")
 resetBtn:SetPoint("TOPLEFT", 20, -204)
 resetBtn:SetScript("OnClick", function()
-    if InCombatLockdown() then print(PREFIX .. "impossible en combat.") return end
+    if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
     ResetPositions()
 end)
 
-local header = Label(panel, "Ordre de priorité", "GameFontNormal")
+local header = Label(panel, "opt_priority", "GameFontNormal")
 header:SetPoint("TOPLEFT", 16, -246)
-local help = Label(panel, "Le 1er critère coché départage ; en cas d'égalité, on passe au suivant.", "GameFontHighlightSmall")
+local help = Label(panel, "opt_priority_help", "GameFontHighlightSmall")
 help:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
 
 local rows = {}
@@ -347,9 +446,10 @@ end
 for i = 1, #DEFAULT_ORDER do
     local y = -286 - (i - 1) * 30
     local row = {}
-    row.rank = Label(panel, i .. ".", "GameFontNormal")
+    row.rank = Label(panel, nil, "GameFontNormal")
+    row.rank:SetText(i .. ".")
     row.rank:SetPoint("TOPLEFT", 20, y - 6)
-    row.cb = CheckBox(panel, "", function(v) DB.criteria[i].on = v; Refresh() end)
+    row.cb = CheckBox(panel, nil, function(v) DB.criteria[i].on = v; Refresh() end)
     row.cb:SetPoint("TOPLEFT", 40, y)
     row.up = ArrowButton(panel, "Up")
     row.up:SetPoint("TOPLEFT", 280, y)
@@ -363,12 +463,43 @@ end
 RefreshRows = function()
     for i, row in ipairs(rows) do
         local c = DB.criteria[i]
-        row.cb.label:SetText(CRITERIA[c.key].label)
+        row.cb.label:SetText(T("crit_" .. c.key))
         row.cb:SetChecked(c.on)
         row.cb.label:SetTextColor(c.on and 1 or 0.5, c.on and 1 or 0.5, c.on and 1 or 0.5)
         row.up:SetEnabled(i > 1)
         row.down:SetEnabled(i < #rows)
     end
+end
+
+-- Langue
+local langHeader = Label(panel, "opt_lang", "GameFontNormal")
+langHeader:SetPoint("TOPLEFT", 16, -416)
+local langHint = Label(panel, "opt_lang_hint", "GameFontHighlightSmall")
+langHint:SetPoint("LEFT", langHeader, "RIGHT", 10, 0)
+local langButtons = {}
+local function RefreshLangButtons()
+    for key, b in pairs(langButtons) do
+        b:SetEnabled(key ~= DB.lang) -- la langue active apparaît grisée
+    end
+end
+
+local function ApplyLanguage()
+    L = ResolveLang()
+    for _, entry in ipairs(localized) do entry[1]:SetText(T(entry[2])) end
+    if DB then RefreshRows() end
+end
+
+for i, choice in ipairs(LANG_CHOICES) do
+    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    b:SetSize(100, 24)
+    b:SetPoint("TOPLEFT", 16 + (i - 1) * 106, -438)
+    if LANGS[choice] then b:SetText(LANGS[choice].name) else Loc(b, "lang_auto") end
+    b:SetScript("OnClick", function()
+        DB.lang = choice
+        ApplyLanguage()
+        RefreshLangButtons()
+    end)
+    langButtons[choice] = b
 end
 
 panel:SetScript("OnShow", function()
@@ -380,6 +511,7 @@ panel:SetScript("OnShow", function()
     cbLock:SetChecked(DB.locked)
     cbMinimap:SetChecked(not DB.minimap.hide)
     RefreshRows()
+    RefreshLangButtons()
 end)
 
 local settingsCategory
@@ -453,7 +585,7 @@ minimapBtn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil
 
 minimapBtn:SetScript("OnClick", function(_, mouse)
     if mouse == "RightButton" then
-        if InCombatLockdown() then print(PREFIX .. "impossible en combat.") return end
+        if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
         local show = not (DB.showPlain or DB.showStats or DB.showDrink)
         DB.showPlain, DB.showStats, DB.showDrink = show, show, show
         Refresh()
@@ -464,9 +596,9 @@ end)
 minimapBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("FeedMePLZ", 1, 0.53, 0)
-    GameTooltip:AddLine("Clic gauche : options", 1, 1, 1)
-    GameTooltip:AddLine("Clic droit : afficher / masquer les boutons", 1, 1, 1)
-    GameTooltip:AddLine("Glisser : déplacer autour de la minimap", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(T("mm_left"), 1, 1, 1)
+    GameTooltip:AddLine(T("mm_right"), 1, 1, 1)
+    GameTooltip:AddLine(T("mm_drag"), 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end)
 minimapBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -499,6 +631,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 == ADDON then
             InitDB()
+            ApplyLanguage()
             for _, kind in ipairs(KINDS) do ApplyPosition(buttons[kind]) end
             RegisterPanel()
             PlaceMinimapButton()
@@ -519,17 +652,17 @@ SlashCmdList.FEEDMEPLZ = function(msg)
         OpenPanel()
         return
     end
-    if InCombatLockdown() then print(PREFIX .. "pas en combat.") return end
+    if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
     if msg == "lock" then
         DB.locked = true
-        print(PREFIX .. "boutons verrouillés.")
+        print(PREFIX .. T("msg_locked"))
     elseif msg == "unlock" then
         DB.locked = false
-        print(PREFIX .. "boutons déverrouillés (Maj + glisser).")
+        print(PREFIX .. T("msg_unlocked"))
     elseif msg == "reset" then
         ResetPositions()
-        print(PREFIX .. "positions réinitialisées.")
+        print(PREFIX .. T("msg_reset"))
     else
-        print(PREFIX .. "/fmp (options) | lock | unlock | reset")
+        print(PREFIX .. T("msg_usage"))
     end
 end

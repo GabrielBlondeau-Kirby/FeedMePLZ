@@ -27,6 +27,7 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 - Ordre de priorité : cocher les critères utilisés et les ordonner avec ↑/↓.
   Le premier critère coché départage ; en cas d'égalité, on passe au suivant.
   Critères : stack la plus basse / haute, niveau requis le plus faible / élevé.
+- Langue de l'interface : Auto (langue du jeu), English, Français.
 
 ## Détection
 
