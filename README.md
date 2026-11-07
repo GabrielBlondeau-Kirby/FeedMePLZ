@@ -1,6 +1,7 @@
 # FeedMePLZ
 
-Addon WoW : deux boutons flottants qui mangent la nourriture de vos sacs.
+Addon WoW : une icône ronde qui ouvre un petit cadre avec trois boutons pour
+manger la nourriture de vos sacs.
 
 - **Nourriture simple** : la nourriture sans buff.
 - **Nourriture à stats** (bordure dorée) : celle qui donne « Bien nourri »,
@@ -14,16 +15,21 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 ## Utilisation
 
-- Clic sur un bouton : mange.
-- **Maj + glisser** : déplacer un bouton (position sauvegardée).
+- Clic sur l'icône ronde : ouvrir / fermer le cadre.
+- Clic sur un bouton du cadre : manger / boire.
+- **Maj + glisser** l'icône : déplacer l'ensemble (position sauvegardée).
+- **En combat**, le cadre se ferme tout seul et l'icône devient transparente
+  (on ne peut pas manger en combat). Il se rouvre à la sortie du combat.
 - `/fmp` : ouvre les options (aussi dans Échap → Options → AddOns).
 - `/fmp lock` / `unlock` / `reset`
-- **Icône de la minimap** : clic gauche = options, clic droit = afficher /
-  masquer les boutons, glisser = la déplacer autour de la minimap.
+- **Icône de la minimap** : clic gauche = ouvrir / fermer le cadre,
+  clic droit = options, glisser = la déplacer autour de la minimap.
 
 ### Options
 
-- Afficher / masquer chaque bouton, verrouiller, réinitialiser les positions.
+- Boutons affichés dans le cadre, fermeture automatique en combat,
+  verrouillage, réinitialisation de la position.
+- Thèmes du cadre : Sombre, Doré, Arcane, Gangrène, Sang.
 - Ordre de priorité : cocher les critères utilisés et les ordonner avec ↑/↓.
   Le premier critère coché départage ; en cas d'égalité, on passe au suivant.
   Critères : stack la plus basse / haute, niveau requis le plus faible / élevé.
@@ -37,8 +43,7 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 ## Installation
 
-Copier le dossier `FeedMePLZ` dans `World of Warcraft/_classic_era_/Interface/AddOns/`
-(ou le dossier `_classic_`/`_anniversary_` selon votre version).
+Copier le dossier `FeedMePLZ` dans `World of Warcraft/_forever_/Interface/AddOns/`.
 
 ## Licence
 

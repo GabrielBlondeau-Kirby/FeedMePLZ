@@ -1,7 +1,12 @@
--- FeedMePLZ : deux boutons flottants (nourriture simple / nourriture à stats)
--- qui choisissent la nourriture selon un classement de critères configurable.
+-- FeedMePLZ : une icône ronde qui ouvre un petit cadre avec trois boutons
+-- (nourriture simple / nourriture à stats / boisson). Chaque bouton choisit
+-- la nourriture selon un classement de critères configurable.
+-- Le cadre se ferme tout seul en combat (on ne peut pas manger) et l'icône
+-- devient transparente ; il se rouvre à la sortie du combat.
 local ADDON = ...
 local PREFIX = "|cffff8800FeedMePLZ|r : "
+local ICON = "Interface\\AddOns\\FeedMePLZ\\Media\\icon"
+local BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
 
 ---------------------------------------------------------------------------
 -- Langues de l'interface (la détection de la nourriture n'en dépend pas :
@@ -16,13 +21,24 @@ local LANGS = {
             kind_stats = "Stat food",
             kind_drink = "Drink",
             empty = "Nothing in your bags.",
-            btn_hint = "Shift + drag: move   /fmp: options",
+            empty_frame = "No button shown (see /fmp).",
+            btn_hint = "/fmp: options",
+            tip_click = "Click: open / close",
+            tip_drag = "Shift + drag: move   /fmp: options",
+            tip_combat = "Closed during combat.",
             opt_plain = "Show the \"Plain food\" button",
             opt_stats = "Show the \"Stat food\" button (gold border)",
             opt_drink = "Show the \"Drink\" button (blue border, mana classes)",
-            opt_lock = "Lock button positions",
+            opt_lock = "Lock the position",
             opt_minimap = "Show the minimap icon",
-            opt_reset = "Reset positions",
+            opt_combat = "Close automatically in combat (icon turns transparent)",
+            opt_reset = "Reset position",
+            opt_theme = "Theme",
+            theme_dark = "Dark",
+            theme_gold = "Gold",
+            theme_arcane = "Arcane",
+            theme_fel = "Fel",
+            theme_blood = "Blood",
             opt_priority = "Priority order",
             opt_priority_help = "The first ticked criterion decides; on a tie, the next one is used.",
             opt_lang = "Language",
@@ -32,13 +48,13 @@ local LANGS = {
             crit_stackHigh = "Highest stack",
             crit_levelLow = "Lowest level",
             crit_levelHigh = "Highest level",
-            mm_left = "Left-click: options",
-            mm_right = "Right-click: show / hide the buttons",
+            mm_left = "Left-click: open / close",
+            mm_right = "Right-click: options",
             mm_drag = "Drag: move around the minimap",
             msg_combat = "not possible in combat.",
-            msg_locked = "buttons locked.",
-            msg_unlocked = "buttons unlocked (Shift + drag).",
-            msg_reset = "positions reset.",
+            msg_locked = "position locked.",
+            msg_unlocked = "position unlocked (Shift + drag).",
+            msg_reset = "position reset.",
             msg_usage = "/fmp (options) | lock | unlock | reset",
         },
     },
@@ -50,13 +66,24 @@ local LANGS = {
             kind_stats = "Nourriture à stats",
             kind_drink = "Boisson",
             empty = "Rien dans les sacs.",
-            btn_hint = "Maj + glisser : déplacer   /fmp : options",
+            empty_frame = "Aucun bouton affiché (voir /fmp).",
+            btn_hint = "/fmp : options",
+            tip_click = "Clic : ouvrir / fermer",
+            tip_drag = "Maj + glisser : déplacer   /fmp : options",
+            tip_combat = "Fermé pendant le combat.",
             opt_plain = "Afficher le bouton « Nourriture simple »",
             opt_stats = "Afficher le bouton « Nourriture à stats » (bordure dorée)",
             opt_drink = "Afficher le bouton « Boisson » (bordure bleue, classes à mana)",
-            opt_lock = "Verrouiller la position des boutons",
+            opt_lock = "Verrouiller la position",
             opt_minimap = "Afficher l'icône autour de la minimap",
-            opt_reset = "Réinitialiser positions",
+            opt_combat = "Fermer automatiquement en combat (icône transparente)",
+            opt_reset = "Réinitialiser la position",
+            opt_theme = "Thème",
+            theme_dark = "Sombre",
+            theme_gold = "Doré",
+            theme_arcane = "Arcane",
+            theme_fel = "Gangrène",
+            theme_blood = "Sang",
             opt_priority = "Ordre de priorité",
             opt_priority_help = "Le 1er critère coché départage ; en cas d'égalité, on passe au suivant.",
             opt_lang = "Langue",
@@ -66,13 +93,13 @@ local LANGS = {
             crit_stackHigh = "Stack la plus haute",
             crit_levelLow = "Niveau le plus faible",
             crit_levelHigh = "Niveau le plus élevé",
-            mm_left = "Clic gauche : options",
-            mm_right = "Clic droit : afficher / masquer les boutons",
+            mm_left = "Clic gauche : ouvrir / fermer",
+            mm_right = "Clic droit : options",
             mm_drag = "Glisser : déplacer autour de la minimap",
             msg_combat = "impossible en combat.",
-            msg_locked = "boutons verrouillés.",
-            msg_unlocked = "boutons déverrouillés (Maj + glisser).",
-            msg_reset = "positions réinitialisées.",
+            msg_locked = "position verrouillée.",
+            msg_unlocked = "position déverrouillée (Maj + glisser).",
+            msg_reset = "position réinitialisée.",
             msg_usage = "/fmp (options) | lock | unlock | reset",
         },
     },
@@ -139,14 +166,28 @@ local DEFAULT_ORDER = {
     { key = "levelHigh", on = false },
 }
 
+local THEMES = {
+    { key = "dark",   bg = { 0, 0, 0, 0.80 },          border = { 0.55, 0.55, 0.55 } },
+    { key = "gold",   bg = { 0.10, 0.07, 0.03, 0.88 }, border = { 1.00, 0.80, 0.20 } },
+    { key = "arcane", bg = { 0.05, 0.03, 0.15, 0.88 }, border = { 0.65, 0.45, 1.00 } },
+    { key = "fel",    bg = { 0.02, 0.10, 0.02, 0.88 }, border = { 0.35, 1.00, 0.20 } },
+    { key = "blood",  bg = { 0.12, 0.02, 0.02, 0.88 }, border = { 0.90, 0.15, 0.15 } },
+}
+local THEME_BY_KEY = {}
+for _, t in ipairs(THEMES) do THEME_BY_KEY[t.key] = t end
+
 local function InitDB()
     FeedMePLZDB = FeedMePLZDB or {}
     DB = FeedMePLZDB
     DB.lang = LANGS[DB.lang or ""] and DB.lang or "auto"
-    DB.pos = (type(DB.pos) == "table" and DB.pos.plain == nil and DB.pos[1]) and { plain = DB.pos } or (DB.pos or {})
+    -- Une seule position (l'icône ronde) ; les anciennes positions par bouton sont abandonnées.
+    if type(DB.pos) ~= "table" or not DB.pos[1] then DB.pos = nil end
     if DB.showPlain == nil then DB.showPlain = true end
     if DB.showStats == nil then DB.showStats = true end
     if DB.showDrink == nil then DB.showDrink = true end
+    if DB.combatClose == nil then DB.combatClose = true end
+    if DB.open == nil then DB.open = true end
+    DB.theme = THEME_BY_KEY[DB.theme or ""] and DB.theme or "gold"
     DB.minimap = DB.minimap or { angle = 225, hide = false }
     -- Classement : on garde l'ordre sauvegardé, on ajoute les critères manquants.
     local seen, order = {}, {}
@@ -244,28 +285,112 @@ local function FindBestFoods()
 end
 
 ---------------------------------------------------------------------------
--- Boutons sécurisés (utiliser un objet est une action protégée)
+-- Icône ronde (ouvre / ferme le cadre)
 ---------------------------------------------------------------------------
-local buttons = {}
+local TOGGLE = 52
+local k = TOGGLE / 31 -- mise à l'échelle du modèle « bouton de minimap »
 
-local function ApplyPosition(btn)
-    btn:ClearAllPoints()
-    local p = DB.pos[btn.kind]
-    if p then
-        btn:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+local toggle = CreateFrame("Button", "FeedMePLZToggle", UIParent, "SecureHandlerClickTemplate")
+toggle:SetSize(TOGGLE, TOGGLE)
+toggle:SetFrameStrata("MEDIUM")
+toggle:SetFrameLevel(20)
+toggle:SetMovable(true)
+toggle:SetClampedToScreen(true)
+toggle:RegisterForClicks("AnyUp")
+toggle:RegisterForDrag("LeftButton")
+
+local tIcon = toggle:CreateTexture(nil, "ARTWORK")
+tIcon:SetTexture(ICON)
+tIcon:SetSize(20 * k, 20 * k)
+tIcon:SetPoint("TOPLEFT", 6 * k, -5.5 * k)
+if tIcon.SetMask then tIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") end
+
+local tRing = toggle:CreateTexture(nil, "OVERLAY")
+tRing:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+tRing:SetSize(53 * k, 53 * k)
+tRing:SetPoint("TOPLEFT")
+
+local tHl = toggle:CreateTexture(nil, "HIGHLIGHT")
+tHl:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+tHl:SetBlendMode("ADD")
+tHl:SetAllPoints(tIcon)
+
+---------------------------------------------------------------------------
+-- Le cadre (protégé : il contient des boutons sécurisés)
+---------------------------------------------------------------------------
+local frameTemplate = "SecureHandlerStateTemplate" .. (BACKDROP_TEMPLATE and "," .. BACKDROP_TEMPLATE or "")
+local frame = CreateFrame("Frame", "FeedMePLZFrame", UIParent, frameTemplate)
+frame:SetFrameStrata("MEDIUM")
+frame:SetFrameLevel(5)
+frame:SetPoint("TOPLEFT", toggle, "CENTER", 0, 2)
+frame:SetSize(200, 60)
+frame:Hide()
+
+local emptyText = Loc(frame:CreateFontString(nil, "OVERLAY", "GameFontDisable"), "empty_frame")
+
+-- Clic sur l'icône : ouvre / ferme, sauf en combat si la fermeture auto est active.
+toggle:SetFrameRef("frame", frame)
+toggle:SetAttribute("_onclick", [[
+    local frame = self:GetFrameRef("frame")
+    if frame:GetAttribute("incombat") and frame:GetAttribute("combatclose") then return end
+    frame:SetAttribute("autoclosed", nil)
+    if frame:IsShown() then frame:Hide() else frame:Show() end
+]])
+
+-- Entrée en combat : on ferme et l'icône devient transparente.
+-- Sortie : l'icône redevient opaque et on rouvre si c'est le combat qui a fermé.
+frame:SetFrameRef("toggle", toggle)
+frame:SetAttribute("_onstate-combat", [[
+    local toggle = self:GetFrameRef("toggle")
+    if newstate == "1" then
+        self:SetAttribute("incombat", 1)
+        if not self:GetAttribute("combatclose") then return end
+        toggle:SetAlpha(0.35)
+        if self:IsShown() then
+            self:SetAttribute("autoclosed", 1)
+            self:Hide()
+        end
     else
-        btn:SetPoint("CENTER", UIParent, "CENTER", btn.defaultX, -150)
+        self:SetAttribute("incombat", nil)
+        toggle:SetAlpha(1)
+        if self:GetAttribute("autoclosed") then
+            self:Show()
+            self:SetAttribute("autoclosed", nil)
+        end
     end
+]])
+RegisterStateDriver(frame, "combat", "[combat] 1; 0")
+
+-- On ne mémorise que les ouvertures / fermetures manuelles.
+frame:HookScript("OnShow", function(self) if DB and not self:GetAttribute("autoclosed") then DB.open = true end end)
+frame:HookScript("OnHide", function(self) if DB and not self:GetAttribute("autoclosed") then DB.open = false end end)
+
+local function ApplyTheme()
+    local t = THEME_BY_KEY[DB.theme]
+    if frame.SetBackdrop then
+        frame:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 14,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        frame:SetBackdropColor(unpack(t.bg))
+        frame:SetBackdropBorderColor(unpack(t.border))
+    end
+    tRing:SetVertexColor(unpack(t.border))
 end
 
-local function CreateFoodButton(kind, defaultX, emptyIcon, borderColor)
-    local btn = CreateFrame("Button", "FeedMePLZ" .. kind .. "Button", UIParent, "SecureActionButtonTemplate")
-    btn.kind, btn.defaultX, btn.emptyIcon = kind, defaultX, emptyIcon
-    btn:SetSize(40, 40)
-    btn:SetMovable(true)
-    btn:SetClampedToScreen(true)
+---------------------------------------------------------------------------
+-- Les trois boutons (sécurisés : utiliser un objet est une action protégée)
+---------------------------------------------------------------------------
+local BTN, GAP = 40, 8
+local buttons = {}
+
+local function CreateFoodButton(kind, emptyIcon, borderColor)
+    local btn = CreateFrame("Button", "FeedMePLZ" .. kind .. "Button", frame, "SecureActionButtonTemplate")
+    btn.kind, btn.emptyIcon = kind, emptyIcon
+    btn:SetSize(BTN, BTN)
     btn:RegisterForClicks("AnyUp", "AnyDown")
-    btn:RegisterForDrag("LeftButton")
     btn:SetAttribute("type", "item")
 
     btn.icon = btn:CreateTexture(nil, "ARTWORK")
@@ -275,7 +400,7 @@ local function CreateFoodButton(kind, defaultX, emptyIcon, borderColor)
     local border = btn:CreateTexture(nil, "OVERLAY")
     border:SetTexture("Interface\\Buttons\\UI-Quickslot2")
     border:SetPoint("CENTER")
-    border:SetSize(66, 66)
+    border:SetSize(BTN * 1.65, BTN * 1.65)
     if borderColor then border:SetVertexColor(unpack(borderColor)) end
 
     btn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
@@ -284,14 +409,6 @@ local function CreateFoodButton(kind, defaultX, emptyIcon, borderColor)
     btn.countText = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     btn.countText:SetPoint("BOTTOMRIGHT", -2, 2)
 
-    btn:SetScript("OnDragStart", function(self)
-        if IsShiftKeyDown() and not InCombatLockdown() and not DB.locked then self:StartMoving() end
-    end)
-    btn:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, relPoint, x, y = self:GetPoint()
-        DB.pos[self.kind] = { point, relPoint, x, y }
-    end)
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local title = T("kind_" .. self.kind)
@@ -312,15 +429,21 @@ local function CreateFoodButton(kind, defaultX, emptyIcon, borderColor)
     return btn
 end
 
-CreateFoodButton("plain", -24, "Interface\\Icons\\INV_Misc_Food_15")
-CreateFoodButton("stats", 24, "Interface\\Icons\\INV_Misc_Food_64", { 1, 0.82, 0 })
-CreateFoodButton("drink", 72, "Interface\\Icons\\INV_Drink_07", { 0.4, 0.7, 1 })
+CreateFoodButton("plain", "Interface\\Icons\\INV_Misc_Food_15")
+CreateFoodButton("stats", "Interface\\Icons\\INV_Misc_Food_64", { 1, 0.82, 0 })
+CreateFoodButton("drink", "Interface\\Icons\\INV_Drink_07", { 0.4, 0.7, 1 })
 
 -- Classes sans mana : pas de bouton Boisson.
 local NO_MANA = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true, DEMONHUNTER = true }
 local _, playerClass = UnitClass("player")
 local hasMana = not NO_MANA[playerClass]
 local KINDS = { "plain", "stats", "drink" }
+
+local function IsKindShown(kind)
+    if kind == "plain" then return DB.showPlain end
+    if kind == "stats" then return DB.showStats end
+    return DB.showDrink and hasMana
+end
 
 local function SetButtonFood(btn, e)
     btn.itemID = e and e.id
@@ -337,6 +460,32 @@ local function SetButtonFood(btn, e)
     end
 end
 
+-- Place les boutons visibles en ligne, à droite de l'icône ronde qui chevauche le coin.
+local function Layout()
+    local x0 = TOGGLE / 2 + 10
+    local n = 0
+    for _, kind in ipairs(KINDS) do
+        local btn = buttons[kind]
+        if IsKindShown(kind) then
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPLEFT", frame, "TOPLEFT", x0 + n * (BTN + GAP), -12)
+            btn:Show()
+            n = n + 1
+        else
+            btn:Hide()
+        end
+    end
+    if n == 0 then
+        emptyText:ClearAllPoints()
+        emptyText:SetPoint("LEFT", frame, "TOPLEFT", x0, -32)
+        emptyText:Show()
+        frame:SetSize(x0 + emptyText:GetStringWidth() + 14, 64)
+    else
+        emptyText:Hide()
+        frame:SetSize(x0 + n * (BTN + GAP) + 6, BTN + 24)
+    end
+end
+
 local pending = false -- mise à jour reportée à la sortie de combat
 
 local function Refresh()
@@ -347,14 +496,41 @@ local function Refresh()
     for _, kind in ipairs(KINDS) do
         SetButtonFood(buttons[kind], best[kind])
     end
-    buttons.plain:SetShown(DB.showPlain)
-    buttons.stats:SetShown(DB.showStats)
-    buttons.drink:SetShown(DB.showDrink and hasMana)
+    Layout()
 end
 
-local function ResetPositions()
-    DB.pos = {}
-    for _, kind in ipairs(KINDS) do ApplyPosition(buttons[kind]) end
+---------------------------------------------------------------------------
+-- Déplacement et position (on déplace l'icône, le cadre suit)
+---------------------------------------------------------------------------
+toggle:SetScript("OnDragStart", function(self)
+    if IsShiftKeyDown() and not InCombatLockdown() and not DB.locked then self:StartMoving() end
+end)
+toggle:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local point, _, relPoint, x, y = self:GetPoint()
+    DB.pos = { point, relPoint, x, y }
+end)
+toggle:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("FeedMePLZ", 1, 0.53, 0)
+    if InCombatLockdown() and DB.combatClose then
+        GameTooltip:AddLine(T("tip_combat"), 1, 0.3, 0.3)
+    else
+        GameTooltip:AddLine(T("tip_click"), 1, 1, 1)
+    end
+    GameTooltip:AddLine(T("tip_drag"), 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end)
+toggle:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local function ApplyPosition()
+    toggle:ClearAllPoints()
+    local p = DB.pos
+    if p then
+        toggle:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+    else
+        toggle:SetPoint("CENTER", UIParent, "CENTER", -80, -150)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -400,23 +576,52 @@ local cbStats = CheckBox(panel, "opt_stats", function(v) DB.showStats = v; Refre
 cbStats:SetPoint("TOPLEFT", 16, -88)
 local cbDrink = CheckBox(panel, "opt_drink", function(v) DB.showDrink = v; Refresh() end)
 cbDrink:SetPoint("TOPLEFT", 16, -116)
+local cbCombat = CheckBox(panel, "opt_combat", function(v)
+    DB.combatClose = v
+    frame:SetAttribute("combatclose", v)
+end)
+cbCombat:SetPoint("TOPLEFT", 16, -144)
 local cbLock = CheckBox(panel, "opt_lock", function(v) DB.locked = v end)
-cbLock:SetPoint("TOPLEFT", 16, -144)
+cbLock:SetPoint("TOPLEFT", 16, -172)
 local SetMinimapShown -- défini plus bas
 local cbMinimap = CheckBox(panel, "opt_minimap", function(v) SetMinimapShown(v) end)
-cbMinimap:SetPoint("TOPLEFT", 16, -172)
+cbMinimap:SetPoint("TOPLEFT", 16, -200)
 
 local resetBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-resetBtn:SetSize(160, 22)
+resetBtn:SetSize(180, 22)
 Loc(resetBtn, "opt_reset")
-resetBtn:SetPoint("TOPLEFT", 20, -204)
+resetBtn:SetPoint("TOPLEFT", 20, -232)
 resetBtn:SetScript("OnClick", function()
     if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
-    ResetPositions()
+    DB.pos = nil
+    ApplyPosition()
 end)
 
+-- Thèmes
+Label(panel, "opt_theme", "GameFontNormal"):SetPoint("TOPLEFT", 16, -270)
+local themeButtons = {}
+local function RefreshThemeButtons()
+    for key, b in pairs(themeButtons) do
+        b:SetEnabled(key ~= DB.theme) -- le thème actif apparaît grisé
+    end
+end
+for i, t in ipairs(THEMES) do
+    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    b:SetSize(100, 24)
+    b:SetPoint("TOPLEFT", 16 + (i - 1) * 106, -292)
+    Loc(b, "theme_" .. t.key)
+    b:GetFontString():SetTextColor(unpack(t.border))
+    b:SetScript("OnClick", function()
+        DB.theme = t.key
+        ApplyTheme()
+        RefreshThemeButtons()
+    end)
+    themeButtons[t.key] = b
+end
+
+-- Ordre de priorité
 local header = Label(panel, "opt_priority", "GameFontNormal")
-header:SetPoint("TOPLEFT", 16, -246)
+header:SetPoint("TOPLEFT", 16, -334)
 local help = Label(panel, "opt_priority_help", "GameFontHighlightSmall")
 help:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
 
@@ -444,7 +649,7 @@ local function ArrowButton(parent, dir)
 end
 
 for i = 1, #DEFAULT_ORDER do
-    local y = -286 - (i - 1) * 30
+    local y = -372 - (i - 1) * 30
     local row = {}
     row.rank = Label(panel, nil, "GameFontNormal")
     row.rank:SetText(i .. ".")
@@ -473,7 +678,7 @@ end
 
 -- Langue
 local langHeader = Label(panel, "opt_lang", "GameFontNormal")
-langHeader:SetPoint("TOPLEFT", 16, -416)
+langHeader:SetPoint("TOPLEFT", 16, -500)
 local langHint = Label(panel, "opt_lang_hint", "GameFontHighlightSmall")
 langHint:SetPoint("LEFT", langHeader, "RIGHT", 10, 0)
 local langButtons = {}
@@ -486,13 +691,16 @@ end
 local function ApplyLanguage()
     L = ResolveLang()
     for _, entry in ipairs(localized) do entry[1]:SetText(T(entry[2])) end
-    if DB then RefreshRows() end
+    if DB then
+        RefreshRows()
+        if not InCombatLockdown() then Layout() end -- largeur du texte « aucun bouton »
+    end
 end
 
 for i, choice in ipairs(LANG_CHOICES) do
     local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     b:SetSize(100, 24)
-    b:SetPoint("TOPLEFT", 16 + (i - 1) * 106, -438)
+    b:SetPoint("TOPLEFT", 16 + (i - 1) * 106, -522)
     if LANGS[choice] then b:SetText(LANGS[choice].name) else Loc(b, "lang_auto") end
     b:SetScript("OnClick", function()
         DB.lang = choice
@@ -508,8 +716,10 @@ panel:SetScript("OnShow", function()
     cbDrink:SetChecked(DB.showDrink)
     cbDrink:SetEnabled(hasMana)
     cbDrink.label:SetTextColor(hasMana and 1 or 0.5, hasMana and 1 or 0.5, hasMana and 1 or 0.5)
+    cbCombat:SetChecked(DB.combatClose)
     cbLock:SetChecked(DB.locked)
     cbMinimap:SetChecked(not DB.minimap.hide)
+    RefreshThemeButtons()
     RefreshRows()
     RefreshLangButtons()
 end)
@@ -534,9 +744,11 @@ local function OpenPanel()
 end
 
 ---------------------------------------------------------------------------
--- Icône autour de la minimap (glisser pour la faire tourner)
+-- Icône autour de la minimap
+-- Clic gauche : ouvre / ferme le cadre (sécurisé). Clic droit : options.
+-- Glisser : faire tourner autour de la minimap (hors combat).
 ---------------------------------------------------------------------------
-local minimapBtn = CreateFrame("Button", "FeedMePLZMinimapButton", Minimap)
+local minimapBtn = CreateFrame("Button", "FeedMePLZMinimapButton", Minimap, "SecureHandlerClickTemplate")
 minimapBtn:SetSize(31, 31)
 minimapBtn:SetFrameStrata("MEDIUM")
 minimapBtn:SetFrameLevel(8)
@@ -550,7 +762,7 @@ mmBg:SetSize(20, 20)
 mmBg:SetPoint("TOPLEFT", 7, -5)
 
 local mmIcon = minimapBtn:CreateTexture(nil, "ARTWORK")
-mmIcon:SetTexture("Interface\\AddOns\\FeedMePLZ\\Media\\icon")
+mmIcon:SetTexture(ICON)
 mmIcon:SetSize(17, 17)
 mmIcon:SetPoint("TOPLEFT", 7, -6)
 mmIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
@@ -559,6 +771,20 @@ local mmBorder = minimapBtn:CreateTexture(nil, "OVERLAY")
 mmBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 mmBorder:SetSize(53, 53)
 mmBorder:SetPoint("TOPLEFT")
+
+minimapBtn:SetFrameRef("frame", frame)
+minimapBtn:SetAttribute("_onclick", [[
+    if button ~= "LeftButton" then return end
+    local frame = self:GetFrameRef("frame")
+    if frame:GetAttribute("incombat") and frame:GetAttribute("combatclose") then return end
+    frame:SetAttribute("autoclosed", nil)
+    if frame:IsShown() then frame:Hide() else frame:Show() end
+]])
+minimapBtn:HookScript("OnClick", function(_, mouse)
+    if mouse ~= "RightButton" then return end
+    if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
+    OpenPanel()
+end)
 
 local function PlaceMinimapButton()
     local a = math.rad(DB.minimap.angle)
@@ -572,8 +798,11 @@ SetMinimapShown = function(shown)
     minimapBtn:SetShown(shown)
 end
 
+-- Bouton sécurisé : on ne le déplace qu'hors combat.
 minimapBtn:SetScript("OnDragStart", function(self)
+    if InCombatLockdown() then return end
     self:SetScript("OnUpdate", function()
+        if InCombatLockdown() then self:SetScript("OnUpdate", nil) return end
         local mx, my = Minimap:GetCenter()
         local px, py = GetCursorPosition()
         local scale = Minimap:GetEffectiveScale()
@@ -583,16 +812,6 @@ minimapBtn:SetScript("OnDragStart", function(self)
 end)
 minimapBtn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
 
-minimapBtn:SetScript("OnClick", function(_, mouse)
-    if mouse == "RightButton" then
-        if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
-        local show = not (DB.showPlain or DB.showStats or DB.showDrink)
-        DB.showPlain, DB.showStats, DB.showDrink = show, show, show
-        Refresh()
-    else
-        OpenPanel()
-    end
-end)
 minimapBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("FeedMePLZ", 1, 0.53, 0)
@@ -629,14 +848,16 @@ events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
-        if arg1 == ADDON then
-            InitDB()
-            ApplyLanguage()
-            for _, kind in ipairs(KINDS) do ApplyPosition(buttons[kind]) end
-            RegisterPanel()
-            PlaceMinimapButton()
-            minimapBtn:SetShown(not DB.minimap.hide)
-        end
+        if arg1 ~= ADDON then return end
+        InitDB()
+        ApplyLanguage()
+        ApplyPosition()
+        ApplyTheme()
+        frame:SetAttribute("combatclose", DB.combatClose)
+        if DB.open then frame:Show() end
+        PlaceMinimapButton()
+        minimapBtn:SetShown(not DB.minimap.hide)
+        RegisterPanel()
     elseif event == "PLAYER_REGEN_ENABLED" then
         if pending then Refresh() end
     else
@@ -660,7 +881,8 @@ SlashCmdList.FEEDMEPLZ = function(msg)
         DB.locked = false
         print(PREFIX .. T("msg_unlocked"))
     elseif msg == "reset" then
-        ResetPositions()
+        DB.pos = nil
+        ApplyPosition()
         print(PREFIX .. T("msg_reset"))
     else
         print(PREFIX .. T("msg_usage"))
