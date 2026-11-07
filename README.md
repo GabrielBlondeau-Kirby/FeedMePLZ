@@ -38,3 +38,7 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 Copier le dossier `FeedMePLZ` dans `World of Warcraft/_classic_era_/Interface/AddOns/`
 (ou le dossier `_classic_`/`_anniversary_` selon votre version).
+
+## Licence
+
+MIT — voir [LICENSE](LICENSE).
