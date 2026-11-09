@@ -4,6 +4,7 @@
 ## Notes-frFR: Bouton flottant qui mange la nourriture de la plus petite pile du sac.
 ## IconTexture: Interface\AddOns\FeedMePLZ\Media\icon
 ## Author: Kirbye
+## X-Curse-Project-ID: 1790215
 ## Version: @project-version@
 ## SavedVariables: FeedMePLZDB
 
