@@ -55,7 +55,7 @@ local LANGS = {
             msg_locked = "position locked.",
             msg_unlocked = "position unlocked (Shift + drag).",
             msg_reset = "position reset.",
-            msg_usage = "/fmp (options) | lock | unlock | reset",
+            msg_usage = "/fmp (options) | lock | unlock | reset | scan",
         },
     },
     frFR = {
@@ -100,7 +100,7 @@ local LANGS = {
             msg_locked = "position verrouillée.",
             msg_unlocked = "position déverrouillée (Maj + glisser).",
             msg_reset = "position réinitialisée.",
-            msg_usage = "/fmp (options) | lock | unlock | reset",
+            msg_usage = "/fmp (options) | lock | unlock | reset | scan",
         },
     },
 }
@@ -208,29 +208,55 @@ end
 ---------------------------------------------------------------------------
 local FOOD_SPELL = SpellName(433)  -- « Nourriture », localisé
 local DRINK_SPELL = SpellName(430) -- « Boisson », localisé
-local WELL_FED = {}
-for _, s in ipairs({ SpellName(19705) or "", "Well Fed", "Bien nourri" }) do
-    if s ~= "" then WELL_FED[#WELL_FED + 1] = s:lower() end
-end
+-- Indices d'une nourriture à stats dans la ligne « Utiliser : » (en minuscules) :
+-- le buff « Bien nourri », la phrase des 10 secondes, ou le nom d'une caractéristique.
+local STATS_HINTS = {
+    "bien nourri", "well fed",
+    "au moins 10 sec", "at least 10 sec",
+    "endurance", "esprit", "intelligence", "agilit", "force", "puissance", "critique",
+    "hâte", "maîtrise", "polyvalence", "toucher", "régénér", "par 5 sec",
+    "stamina", "spirit", "intellect", "agility", "strength", "attack power", "spell power",
+    "critical", "haste", "mastery", "versatility", "hit rating", "mana per 5", "every 5 sec",
+}
+local wellFedName = SpellName(19705)
+if wellFedName and wellFedName ~= "" then table.insert(STATS_HINTS, wellFedName:lower()) end
 
 local scan = CreateFrame("GameTooltip", "FeedMePLZScanTip", nil, "GameTooltipTemplate")
 
--- true/false, ou nil si l'objet n'est pas encore en cache client.
-local function TooltipHasWellFed(itemID)
+-- Lignes « Utiliser : » de la description, en minuscules ; nil si elles ne sont pas
+-- encore chargées (la description du sort arrive parfois après le reste de l'objet).
+local function UseText(itemID)
     scan:SetOwner(WorldFrame, "ANCHOR_NONE")
     scan:ClearLines()
     scan:SetHyperlink("item:" .. itemID)
-    local n = scan:NumLines()
-    if n == 0 then return nil end
-    for i = 2, n do
+    local parts = {}
+    for i = 2, scan:NumLines() do
         local line = _G["FeedMePLZScanTipTextLeft" .. i]
         local text = line and line:GetText()
         if text then
             text = text:lower()
-            for _, w in ipairs(WELL_FED) do
-                if text:find(w, 1, true) then return true end
+            if text:find("^utiliser") or text:find("^use:") or #parts > 0 then
+                parts[#parts + 1] = text
             end
         end
+    end
+    if #parts == 0 then return nil end
+    return table.concat(parts, " ")
+end
+
+local tries = {} -- itemID -> nombre de lectures sans ligne « Utiliser »
+local MAX_TRIES = 10
+
+-- true/false, ou nil s'il faut réessayer plus tard.
+local function HasStats(itemID)
+    local use = UseText(itemID)
+    if not use then
+        tries[itemID] = (tries[itemID] or 0) + 1
+        if tries[itemID] < MAX_TRIES then return nil end
+        return false -- jamais trouvée : on abandonne, nourriture simple
+    end
+    for _, w in ipairs(STATS_HINTS) do
+        if use:find(w, 1, true) then return true end
     end
     return false
 end
@@ -244,7 +270,7 @@ local function GetFoodInfo(itemID)
     local spell = GetItemSpellCompat(itemID)
     local info = { kind = false, level = minLevel }
     if spell == FOOD_SPELL then
-        local stats = TooltipHasWellFed(itemID)
+        local stats = HasStats(itemID)
         if stats == nil then return nil end
         info.kind = stats and "stats" or "plain"
     elseif spell == DRINK_SPELL then
@@ -267,13 +293,15 @@ local function IsBetter(a, b)
     return false
 end
 
--- Renvoie la meilleure entrée par catégorie : { plain = e, stats = e, drink = e }.
+-- Renvoie la meilleure entrée par catégorie : { plain = e, stats = e, drink = e },
+-- et true si au moins un objet n'a pas encore pu être analysé (à retenter).
 local function FindBestFoods()
-    local best = {}
+    local best, missing = {}, false
     for bag = 0, 4 do
         for slot = 1, (GetNumSlots(bag) or 0) do
             local id = GetItemID(bag, slot)
             local info = id and GetFoodInfo(id)
+            if id and info == nil then missing = true end
             local kind = info and info.kind
             if kind then
                 local e = { bag = bag, slot = slot, id = id, count = GetSlotCount(bag, slot), level = info.level }
@@ -281,7 +309,7 @@ local function FindBestFoods()
             end
         end
     end
-    return best
+    return best, missing
 end
 
 ---------------------------------------------------------------------------
@@ -488,11 +516,27 @@ end
 
 local pending = false -- mise à jour reportée à la sortie de combat
 
-local function Refresh()
+-- Nouvel essai 1 s plus tard quand une description n'était pas encore chargée.
+local retry = CreateFrame("Frame")
+retry:Hide()
+local Refresh
+retry:SetScript("OnUpdate", function(self, e)
+    self.elapsed = self.elapsed + e
+    if self.elapsed > 1 then
+        self:Hide()
+        Refresh()
+    end
+end)
+
+Refresh = function()
     if not DB then return end
     if InCombatLockdown() then pending = true return end
     pending = false
-    local best = FindBestFoods()
+    local best, missing = FindBestFoods()
+    if missing and not retry:IsShown() then
+        retry.elapsed = 0
+        retry:Show()
+    end
     for _, kind in ipairs(KINDS) do
         SetButtonFood(buttons[kind], best[kind])
     end
@@ -871,6 +915,31 @@ SlashCmdList.FEEDMEPLZ = function(msg)
     msg = (msg or ""):lower()
     if msg == "" or msg == "config" or msg == "options" then
         OpenPanel()
+        return
+    end
+    if msg == "scan" then
+        -- Diagnostic : catégorie détectée pour chaque nourriture / boisson des sacs.
+        wipe(infoCache)
+        wipe(tries)
+        local seen = {}
+        for bag = 0, 4 do
+            for slot = 1, (GetNumSlots(bag) or 0) do
+                local id = GetItemID(bag, slot)
+                if id and not seen[id] then
+                    seen[id] = true
+                    local spell = GetItemSpellCompat(id)
+                    if spell == FOOD_SPELL or spell == DRINK_SPELL then
+                        local _, link = GetItemInfoCompat(id)
+                        local info = GetFoodInfo(id)
+                        local kind = info == nil and "?" or T("kind_" .. tostring(info.kind))
+                        print(PREFIX .. (link or id) .. " → " .. kind)
+                        local use = UseText(id)
+                        if use then print("    " .. use) end
+                    end
+                end
+            end
+        end
+        Refresh()
         return
     end
     if InCombatLockdown() then print(PREFIX .. T("msg_combat")) return end
