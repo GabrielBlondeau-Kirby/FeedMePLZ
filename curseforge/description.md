@@ -12,7 +12,7 @@ Made for **WoW Forever**.
   - **Drink** (blue border): only shown for mana classes.
 - **Combat-aware**: the panel closes automatically when combat starts and the round icon turns transparent (you can't eat in combat anyway). It reopens when combat ends.
 - **Configurable priority**: tick and reorder the criteria — lowest stack, highest stack, lowest level, highest level.
-- **Themes**: Dark, Gold, Arcane, Fel, Blood.
+- **Themes**: Dark, Gold, Arcane, Fel, Blood, WoWtesk (classic WoW UI look).
 - **Minimap button**: left-click opens / closes the panel, right-click for options, drag to move it.
 - **Languages**: English and French interface (Auto follows the game client).
 - Works in any client language (detection uses the game's own *Food* / *Drink* spells).
@@ -32,7 +32,7 @@ Made for **WoW Forever**.
 - **Nourriture simple**, **nourriture à stats** (bordure dorée, gardée pour les donjons) et **boisson** (bordure bleue, classes à mana uniquement).
 - **En combat**, le cadre se ferme tout seul et l'icône devient transparente ; il se rouvre après le combat.
 - **Ordre de priorité configurable** : stack la plus basse / haute, niveau le plus faible / élevé.
-- **Thèmes** : Sombre, Doré, Arcane, Gangrène, Sang.
+- **Thèmes** : Sombre, Doré, Arcane, Gangrène, Sang, WoWtesk (look de l’interface WoW).
 - **Icône de minimap** : clic gauche = ouvrir / fermer, clic droit = options, glisser = déplacer.
 - Interface en anglais ou en français (Auto = langue du jeu).
 - `/fmp` : options. **Maj + glisser** l'icône : déplacer.
