@@ -221,10 +221,21 @@ local STATS_HINTS = {
 local wellFedName = SpellName(19705)
 if wellFedName and wellFedName ~= "" then table.insert(STATS_HINTS, wellFedName:lower()) end
 
+-- Phrases qui trahissent une nourriture / une boisson, quel que soit le nom du sort.
+local EAT_HINTS = { "pendant que vous mangez", "while eating", "secondes à manger", "seconds eating" }
+local DRINK_HINTS = { "pendant que vous buvez", "while drinking" }
+
+local function HasAny(s, words)
+    for _, w in ipairs(words) do
+        if s:find(w, 1, true) then return true end
+    end
+    return false
+end
+
 local scan = CreateFrame("GameTooltip", "FeedMePLZScanTip", nil, "GameTooltipTemplate")
 
--- Lignes « Utiliser : » de la description, en minuscules ; nil si elles ne sont pas
--- encore chargées (la description du sort arrive parfois après le reste de l'objet).
+-- Ligne(s) « Utiliser : » de la description, en minuscules ; nil si absente
+-- (pas d'effet, ou description du sort pas encore chargée).
 local function UseText(itemID)
     scan:SetOwner(WorldFrame, "ANCHOR_NONE")
     scan:ClearLines()
@@ -235,7 +246,7 @@ local function UseText(itemID)
         local text = line and line:GetText()
         if text then
             text = text:lower()
-            if text:find("^utiliser") or text:find("^use:") or #parts > 0 then
+            if text:find("^utiliser") or text:find("^use:") then
                 parts[#parts + 1] = text
             end
         end
@@ -247,16 +258,22 @@ end
 local tries = {} -- itemID -> nombre de lectures sans ligne « Utiliser »
 local MAX_TRIES = 10
 
--- true/false, ou nil s'il faut réessayer plus tard.
-local function HasStats(itemID)
+-- Catégorie d'un objet : "plain" | "stats" | "drink" | false, ou nil s'il faut réessayer.
+-- On regarde le nom du sort (Nourriture / Boisson) ET la description, car certains
+-- plats lancent un sort au nom différent.
+local function Classify(itemID, spell, classID)
+    if not spell and classID ~= 0 then return false end -- ni effet ni consommable
     local use = UseText(itemID)
     if not use then
+        if not spell then return false end -- consommable sans effet « Utiliser »
         tries[itemID] = (tries[itemID] or 0) + 1
         if tries[itemID] < MAX_TRIES then return nil end
-        return false -- jamais trouvée : on abandonne, nourriture simple
+        use = "" -- description jamais chargée : on se fie au nom du sort
     end
-    for _, w in ipairs(STATS_HINTS) do
-        if use:find(w, 1, true) then return true end
+    if spell == FOOD_SPELL or HasAny(use, EAT_HINTS) then
+        return HasAny(use, STATS_HINTS) and "stats" or "plain"
+    elseif spell == DRINK_SPELL or HasAny(use, DRINK_HINTS) then
+        return "drink"
     end
     return false
 end
@@ -265,17 +282,11 @@ local infoCache = {} -- itemID -> { kind = "plain"|"stats"|"drink"|false, level 
 local function GetFoodInfo(itemID)
     local cached = infoCache[itemID]
     if cached then return cached end
-    local _, _, _, _, minLevel = GetItemInfoCompat(itemID)
+    local _, _, _, _, minLevel, _, _, _, _, _, _, classID = GetItemInfoCompat(itemID)
     if minLevel == nil then return nil end -- pas encore chargé, retenté plus tard
-    local spell = GetItemSpellCompat(itemID)
-    local info = { kind = false, level = minLevel }
-    if spell == FOOD_SPELL then
-        local stats = HasStats(itemID)
-        if stats == nil then return nil end
-        info.kind = stats and "stats" or "plain"
-    elseif spell == DRINK_SPELL then
-        info.kind = "drink"
-    end
+    local kind = Classify(itemID, GetItemSpellCompat(itemID), classID)
+    if kind == nil then return nil end
+    local info = { kind = kind, level = minLevel }
     infoCache[itemID] = info
     return info
 end
@@ -927,12 +938,13 @@ SlashCmdList.FEEDMEPLZ = function(msg)
                 local id = GetItemID(bag, slot)
                 if id and not seen[id] then
                     seen[id] = true
+                    -- Tous les consommables : on voit aussi ceux que l'addon ignore.
+                    local _, link, _, _, _, _, _, _, _, _, _, classID = GetItemInfoCompat(id)
                     local spell = GetItemSpellCompat(id)
-                    if spell == FOOD_SPELL or spell == DRINK_SPELL then
-                        local _, link = GetItemInfoCompat(id)
+                    if classID == 0 or spell then
                         local info = GetFoodInfo(id)
-                        local kind = info == nil and "?" or T("kind_" .. tostring(info.kind))
-                        print(PREFIX .. (link or id) .. " → " .. kind)
+                        local kind = (info == nil and "?") or (info.kind and T("kind_" .. info.kind)) or "—"
+                        print(PREFIX .. (link or id) .. " → " .. kind .. "  |cff888888(" .. tostring(spell) .. ")|r")
                         local use = UseText(id)
                         if use then print("    " .. use) end
                     end
