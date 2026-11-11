@@ -262,7 +262,9 @@ local MAX_TRIES = 10
 -- On regarde le nom du sort (Nourriture / Boisson) ET la description, car certains
 -- plats lancent un sort au nom différent.
 local function Classify(itemID, spell, classID)
-    if not spell and classID ~= 0 then return false end -- ni effet ni consommable
+    -- Seulement les consommables (classe 0) : une recette (classe 9) contient la
+    -- description du plat qu'elle apprend, « pendant que vous mangez » compris.
+    if classID ~= 0 then return false end
     local use = UseText(itemID)
     if not use then
         if not spell then return false end -- consommable sans effet « Utiliser »
@@ -941,7 +943,7 @@ SlashCmdList.FEEDMEPLZ = function(msg)
                     -- Tous les consommables : on voit aussi ceux que l'addon ignore.
                     local _, link, _, _, _, _, _, _, _, _, _, classID = GetItemInfoCompat(id)
                     local spell = GetItemSpellCompat(id)
-                    if classID == 0 or spell then
+                    if classID == 0 then
                         local info = GetFoodInfo(id)
                         local kind = (info == nil and "?") or (info.kind and T("kind_" .. info.kind)) or "—"
                         print(PREFIX .. (link or id) .. " → " .. kind .. "  |cff888888(" .. tostring(spell) .. ")|r")
