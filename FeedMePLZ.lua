@@ -38,7 +38,7 @@ local LANGS = {
             theme_gold = "Gold",
             theme_arcane = "Arcane",
             theme_fel = "Fel",
-            theme_blood = "Blood",
+            theme_blood = "Blood", theme_wow = "WoWtesk",
             opt_priority = "Priority order",
             opt_priority_help = "The first ticked criterion decides; on a tie, the next one is used.",
             opt_lang = "Language",
@@ -83,7 +83,7 @@ local LANGS = {
             theme_gold = "Doré",
             theme_arcane = "Arcane",
             theme_fel = "Gangrène",
-            theme_blood = "Sang",
+            theme_blood = "Sang", theme_wow = "WoWtesk",
             opt_priority = "Ordre de priorité",
             opt_priority_help = "Le 1er critère coché départage ; en cas d'égalité, on passe au suivant.",
             opt_lang = "Langue",
@@ -172,6 +172,14 @@ local THEMES = {
     { key = "arcane", bg = { 0.05, 0.03, 0.15, 0.88 }, border = { 0.65, 0.45, 1.00 } },
     { key = "fel",    bg = { 0.02, 0.10, 0.02, 0.88 }, border = { 0.35, 1.00, 0.20 } },
     { key = "blood",  bg = { 0.12, 0.02, 0.02, 0.88 }, border = { 0.90, 0.15, 0.15 } },
+    -- « WoWtesk » : cadre de dialogue de l'interface Blizzard, textures d'origine non teintées.
+    { key = "wow", bg = { 1, 1, 1, 1 }, border = { 1, 1, 1 }, ring = { 1, 1, 1 }, label = { 1, 0.82, 0 },
+      backdrop = {
+          bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+          edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+          tile = true, tileSize = 32, edgeSize = 20,
+          insets = { left = 5, right = 5, top = 5, bottom = 5 },
+      } },
 }
 local THEME_BY_KEY = {}
 for _, t in ipairs(THEMES) do THEME_BY_KEY[t.key] = t end
@@ -406,19 +414,21 @@ RegisterStateDriver(frame, "combat", "[combat] 1; 0")
 frame:HookScript("OnShow", function(self) if DB and not self:GetAttribute("autoclosed") then DB.open = true end end)
 frame:HookScript("OnHide", function(self) if DB and not self:GetAttribute("autoclosed") then DB.open = false end end)
 
+local DEFAULT_BACKDROP = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+}
+
 local function ApplyTheme()
     local t = THEME_BY_KEY[DB.theme]
     if frame.SetBackdrop then
-        frame:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true, tileSize = 16, edgeSize = 14,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 },
-        })
+        frame:SetBackdrop(t.backdrop or DEFAULT_BACKDROP)
         frame:SetBackdropColor(unpack(t.bg))
         frame:SetBackdropBorderColor(unpack(t.border))
     end
-    tRing:SetVertexColor(unpack(t.border))
+    tRing:SetVertexColor(unpack(t.ring or t.border))
 end
 
 ---------------------------------------------------------------------------
@@ -664,10 +674,10 @@ local function RefreshThemeButtons()
 end
 for i, t in ipairs(THEMES) do
     local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    b:SetSize(100, 24)
-    b:SetPoint("TOPLEFT", 16 + (i - 1) * 106, -292)
+    b:SetSize(88, 24)
+    b:SetPoint("TOPLEFT", 16 + (i - 1) * 94, -292)
     Loc(b, "theme_" .. t.key)
-    b:GetFontString():SetTextColor(unpack(t.border))
+    b:GetFontString():SetTextColor(unpack(t.label or t.border))
     b:SetScript("OnClick", function()
         DB.theme = t.key
         ApplyTheme()
