@@ -29,7 +29,7 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 
 - Boutons affichés dans le cadre, fermeture automatique en combat,
   verrouillage, réinitialisation de la position.
-- Thèmes du cadre : Sombre, Doré, Arcane, Gangrène, Sang.
+- Thèmes du cadre : Sombre, Doré, Arcane, Gangrène, Sang, WoWtesk (look de l’interface WoW).
 - Ordre de priorité : cocher les critères utilisés et les ordonner avec ↑/↓.
   Le premier critère coché départage ; en cas d'égalité, on passe au suivant.
   Critères : stack la plus basse / haute, niveau requis le plus faible / élevé.
