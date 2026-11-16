@@ -266,7 +266,16 @@ end
 local tries = {} -- itemID -> nombre de lectures sans ligne « Utiliser »
 local MAX_TRIES = 10
 
--- Catégorie d'un objet : "plain" | "stats" | "drink" | false, ou nil s'il faut réessayer.
+-- Nourriture qui rend aussi du mana (« … points de vie et 4410 points de mana … »,
+-- pains de mana invoqués par ex.). On exige « vie et N mana » pour ne pas confondre
+-- avec un buff « rend N points de mana toutes les 5 sec ».
+local function RestoresMana(use)
+    return use:find("vie et %d+ points de mana") ~= nil
+        or use:find("health and %d+ mana") ~= nil
+end
+
+-- Catégorie d'un objet : "plain" | "stats" | "drink" | false (ou nil s'il faut
+-- réessayer), puis true si une nourriture compte aussi comme boisson.
 -- On regarde le nom du sort (Nourriture / Boisson) ET la description, car certains
 -- plats lancent un sort au nom différent.
 local function Classify(itemID, spell, classID)
@@ -281,22 +290,23 @@ local function Classify(itemID, spell, classID)
         use = "" -- description jamais chargée : on se fie au nom du sort
     end
     if spell == FOOD_SPELL or HasAny(use, EAT_HINTS) then
-        return HasAny(use, STATS_HINTS) and "stats" or "plain"
+        return HasAny(use, STATS_HINTS) and "stats" or "plain", RestoresMana(use)
     elseif spell == DRINK_SPELL or HasAny(use, DRINK_HINTS) then
         return "drink"
     end
     return false
 end
 
-local infoCache = {} -- itemID -> { kind = "plain"|"stats"|"drink"|false, level = n }
+-- itemID -> { kind = "plain"|"stats"|"drink"|false, alsoDrink = bool, level = n }
+local infoCache = {}
 local function GetFoodInfo(itemID)
     local cached = infoCache[itemID]
     if cached then return cached end
     local _, _, _, _, minLevel, _, _, _, _, _, _, classID = GetItemInfoCompat(itemID)
     if minLevel == nil then return nil end -- pas encore chargé, retenté plus tard
-    local kind = Classify(itemID, GetItemSpellCompat(itemID), classID)
+    local kind, alsoDrink = Classify(itemID, GetItemSpellCompat(itemID), classID)
     if kind == nil then return nil end
-    local info = { kind = kind, level = minLevel }
+    local info = { kind = kind, alsoDrink = alsoDrink and true or false, level = minLevel }
     infoCache[itemID] = info
     return info
 end
@@ -327,6 +337,8 @@ local function FindBestFoods()
             if kind then
                 local e = { bag = bag, slot = slot, id = id, count = GetSlotCount(bag, slot), level = info.level }
                 if not best[kind] or IsBetter(e, best[kind]) then best[kind] = e end
+                -- Une nourriture qui rend du mana est aussi candidate pour le bouton Boisson.
+                if info.alsoDrink and (not best.drink or IsBetter(e, best.drink)) then best.drink = e end
             end
         end
     end
@@ -956,6 +968,7 @@ SlashCmdList.FEEDMEPLZ = function(msg)
                     if classID == 0 then
                         local info = GetFoodInfo(id)
                         local kind = (info == nil and "?") or (info.kind and T("kind_" .. info.kind)) or "—"
+                        if info and info.alsoDrink then kind = kind .. " + " .. T("kind_drink") end
                         print(PREFIX .. (link or id) .. " → " .. kind .. "  |cff888888(" .. tostring(spell) .. ")|r")
                         local use = UseText(id)
                         if use then print("    " .. use) end
