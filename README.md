@@ -40,6 +40,8 @@ Exemple : 2 poulets + 20 champignons → mange un poulet.
 - Nourriture : l'objet lance le sort « Nourriture » (indépendant de la langue).
 - À stats : sa description contient « Bien nourri » / « Well Fed ».
 - Boisson : l'objet lance le sort « Boisson ».
+- Une nourriture qui rend aussi du mana (« … points de vie et N points de
+  mana », pains de mana invoqués…) est proposée par les deux boutons.
 
 ## Installation
 
